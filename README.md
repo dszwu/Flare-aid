@@ -108,7 +108,7 @@ npm run ingest
 npm run dev
 ```
 
-Visit **http://localhost:3000** — connect MetaMask (Coston2 network) and start donating!
+Visit **https://flare-aid.vercel.app/** — connect MetaMask (Coston2 network) and start donating!
 
 ### Default Admin Credentials
 
