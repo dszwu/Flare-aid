@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAccount, useConnect, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { parseEther } from "viem";
 import { wagmiConfig, coston2 } from "@/lib/wagmi";
@@ -15,10 +15,11 @@ interface DonateFormProps {
 }
 
 export function DonateForm({ eventId, orgId, orgName, walletAddress }: DonateFormProps) {
-  const { isConnected, chainId } = useAccount();
+  const { isConnected, address: donorAddress, chainId } = useAccount();
   const { connect } = useConnect();
   const { switchChain } = useSwitchChain();
   const [amount, setAmount] = useState("");
+  const recordedRef = useRef(false);
 
   const isWrongNetwork = isConnected && chainId !== COSTON2_CHAIN_ID;
 
@@ -27,6 +28,30 @@ export function DonateForm({ eventId, orgId, orgName, walletAddress }: DonateFor
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
+
+  // Record donation in database after on-chain confirmation
+  useEffect(() => {
+    if (!isSuccess || !hash || !donorAddress || !amount || recordedRef.current) return;
+    recordedRef.current = true;
+
+    fetch("/api/donations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        txHash: hash,
+        donorAddress,
+        eventId,
+        orgId,
+        amountWei: parseEther(amount).toString(),
+        blockNumber: 0,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) console.error("[DonateForm] Failed to record donation:", data.error);
+      })
+      .catch((err) => console.error("[DonateForm] Error recording donation:", err));
+  }, [isSuccess, hash, donorAddress, amount, eventId, orgId]);
 
   const handleDonate = () => {
     if (!amount || parseFloat(amount) <= 0) return;
