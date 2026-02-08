@@ -3,6 +3,7 @@ import { db } from "@/db";
 
 // GET /api/stats — public aggregate stats for transparency
 export async function GET() {
+  console.log("[API] GET /api/stats");
   try {
     const totalDonated = db
       .prepare("SELECT COALESCE(SUM(CAST(amount_wei AS REAL)), 0) as total FROM donations")
@@ -24,6 +25,7 @@ export async function GET() {
       .prepare("SELECT COUNT(DISTINCT donor_address) as count FROM donations")
       .get() as any;
 
+    console.log("[API] GET /api/stats =>", { totalDonated: totalDonated?.total, donationCount: donationCount?.count, activeEvents: activeEvents?.count, completedPayouts: completedPayouts?.count, uniqueDonors: uniqueDonors?.count });
     return NextResponse.json({
       success: true,
       data: {
@@ -35,6 +37,7 @@ export async function GET() {
       },
     });
   } catch (error: any) {
+    console.error("[API] GET /api/stats ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -7,9 +7,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  console.log("[API] GET /api/events/[id]", { id: params.id });
   try {
     const id = parseInt(params.id);
     if (isNaN(id)) {
+      console.warn("[API] GET /api/events/[id] invalid ID:", params.id);
       return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
     }
 
@@ -36,6 +38,7 @@ export async function GET(
       .prepare("SELECT * FROM donations WHERE event_id = ? ORDER BY block_number DESC LIMIT 20")
       .all(id);
 
+    console.log(`[API] GET /api/events/${id} => found, ${allocs.length} allocations, ${donationTotal?.count || 0} donations`);
     return NextResponse.json({
       success: true,
       data: {
@@ -47,6 +50,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
+    console.error("[API] GET /api/events/[id] ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -3,8 +3,10 @@ import path from "path";
 
 // Always store DB in the web package directory regardless of cwd
 const DB_PATH = process.env.FLAREAID_DB_PATH || path.resolve(process.cwd(), "flareaid.db");
+console.log("[DB] Initializing SQLite at:", DB_PATH);
 
 const sqlite = new DatabaseSync(DB_PATH);
+console.log("[DB] SQLite connection opened successfully");
 
 // Enable WAL mode for better concurrent read performance
 sqlite.exec("PRAGMA journal_mode = WAL");

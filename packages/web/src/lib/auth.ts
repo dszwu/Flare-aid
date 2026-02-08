@@ -50,15 +50,24 @@ export async function authenticateAdmin(
   email: string,
   password: string
 ): Promise<AdminSession | null> {
+  console.log("[AUTH] authenticateAdmin called for:", email);
   const admin = db
     .prepare("SELECT id, email, password_hash, role FROM admins WHERE email = ?")
     .get(email) as { id: number; email: string; password_hash: string; role: string } | undefined;
 
-  if (!admin) return null;
+  if (!admin) {
+    console.warn("[AUTH] No admin found with email:", email);
+    return null;
+  }
+  console.log("[AUTH] Admin found, verifying password...");
 
   const valid = bcrypt.compareSync(password, admin.password_hash);
-  if (!valid) return null;
+  if (!valid) {
+    console.warn("[AUTH] Invalid password for:", email);
+    return null;
+  }
 
+  console.log("[AUTH] Authentication successful for:", email);
   return { id: admin.id, email: admin.email, role: admin.role };
 }
 

@@ -4,11 +4,13 @@ import { rowsToCamelCase } from "@/lib/utils";
 
 // GET /api/events — list approved events with donation totals
 export async function GET(req: NextRequest) {
+  console.log("[API] GET /api/events", { url: req.url });
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
   const page = parseInt(searchParams.get("page") || "1");
   const pageSize = parseInt(searchParams.get("pageSize") || "20");
   const offset = (page - 1) * pageSize;
+  console.log("[API] GET /api/events params:", { type, page, pageSize, offset });
 
   try {
     let events: any[];
@@ -38,8 +40,10 @@ export async function GET(req: NextRequest) {
         .all(pageSize, offset);
     }
 
+    console.log(`[API] GET /api/events => ${events.length} events`);
     return NextResponse.json({ success: true, data: rowsToCamelCase(events) });
   } catch (error: any) {
+    console.error("[API] GET /api/events ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

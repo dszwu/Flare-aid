@@ -86,7 +86,7 @@ export default function AdminLoginPage() {
         </form>
 
         <div className="mt-6 text-center text-xs text-gray-400">
-          {/*<p>Default credentials: admin@flareaid.org / admin123</p>*/}
+          {/* <p>Default credentials: admin@flareaid.org / admin123</p> */}
         </div>
       </div>
     </div>

@@ -4,13 +4,16 @@ import { getSessionFromRequest } from "@/lib/auth";
 
 // POST /api/allocations — set allocation splits for an event (admin only)
 export async function POST(req: NextRequest) {
+  console.log("[API] POST /api/allocations");
   const session = await getSessionFromRequest(req);
   if (!session) {
+    console.warn("[API] POST /api/allocations => unauthorized");
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const body = await req.json();
+    console.log("[API] POST /api/allocations body:", { eventId: body.eventId, splitsCount: body.splits?.length });
     const { eventId, splits } = body;
 
     if (!eventId || !splits || !Array.isArray(splits) || splits.length === 0) {
@@ -40,11 +43,13 @@ export async function POST(req: NextRequest) {
       stmt.run(eventId, split.orgId, split.splitBps, session.email, now);
     }
 
+    console.log(`[API] POST /api/allocations => saved ${splits.length} splits for event ${eventId}`);
     return NextResponse.json({
       success: true,
       data: { eventId, splits, approvedBy: session.email },
     });
   } catch (error: any) {
+    console.error("[API] POST /api/allocations ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

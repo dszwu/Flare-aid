@@ -3,8 +3,10 @@ import { authenticateAdmin, signToken, COOKIE_NAME } from "@/lib/auth";
 
 // POST /api/auth/login — admin login
 export async function POST(req: NextRequest) {
+  console.log("[API] POST /api/auth/login");
   try {
     const { email, password } = await req.json();
+    console.log("[API] POST /api/auth/login attempt for:", email);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -15,11 +17,13 @@ export async function POST(req: NextRequest) {
 
     const session = await authenticateAdmin(email, password);
     if (!session) {
+      console.warn("[API] POST /api/auth/login FAILED for:", email);
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
         { status: 401 }
       );
     }
+    console.log("[API] POST /api/auth/login SUCCESS for:", email);
 
     const token = await signToken(session);
 
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
+    console.error("[API] POST /api/auth/login ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

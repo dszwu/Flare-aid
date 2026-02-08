@@ -5,20 +5,25 @@ import { rowsToCamelCase } from "@/lib/utils";
 
 // GET /api/orgs — list organizations (public: only allowlisted)
 export async function GET() {
+  console.log("[API] GET /api/orgs");
   try {
     const orgs = db
       .prepare("SELECT * FROM organizations WHERE allowlisted = 1")
       .all();
+    console.log(`[API] GET /api/orgs => ${orgs.length} orgs`);
     return NextResponse.json({ success: true, data: rowsToCamelCase(orgs) });
   } catch (error: any) {
+    console.error("[API] GET /api/orgs ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
 // POST /api/orgs — add organization (admin only)
 export async function POST(req: NextRequest) {
+  console.log("[API] POST /api/orgs");
   const session = await getSessionFromRequest(req);
   if (!session) {
+    console.warn("[API] POST /api/orgs => unauthorized");
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
