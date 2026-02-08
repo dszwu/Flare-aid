@@ -57,9 +57,12 @@ export async function runIngestion(): Promise<{ total: number; new: number; sour
   for (const event of results) {
     if (await isDuplicate(event)) continue;
 
+    // Auto-approve events with meaningful severity; low-severity ones go to pending review
+    const autoStatus = event.severityScore >= 25 ? 'approved' : 'pending';
+
     await db.query(
       `INSERT INTO disaster_events (external_id, source, type, title, description, latitude, longitude, severity_score, raw_payload, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         event.externalId,
         event.source,
@@ -70,6 +73,7 @@ export async function runIngestion(): Promise<{ total: number; new: number; sour
         event.longitude,
         event.severityScore,
         JSON.stringify(event.rawPayload),
+        autoStatus,
         event.occurredAt || new Date().toISOString(),
       ]
     );

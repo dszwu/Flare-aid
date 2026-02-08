@@ -33,6 +33,12 @@ export default function AdminEventsPage() {
     loadData();
   };
 
+  const approveAll = async () => {
+    if (!confirm(`Approve all ${pendingEvents.length} pending events?`)) return;
+    await fetch(`/api/events/all/approve`, { method: "POST" });
+    loadData();
+  };
+
   const openAllocModal = (event: any) => {
     setAllocModal(event);
     // Initialize with equal splits across all orgs
@@ -70,9 +76,19 @@ export default function AdminEventsPage() {
 
       {/* Pending events */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Pending Review ({pendingEvents.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Pending Review ({pendingEvents.length})
+          </h2>
+          {pendingEvents.length > 0 && (
+            <button
+              onClick={approveAll}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+            >
+              Approve All
+            </button>
+          )}
+        </div>
 
         {loading ? (
           <div className="text-gray-400">Loading...</div>
