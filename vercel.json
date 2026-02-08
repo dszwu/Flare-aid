@@ -3,15 +3,5 @@
   "buildCommand": "npm run build --workspace=packages/web",
   "installCommand": "npm install",
   "outputDirectory": "packages/web/.next",
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/ingest",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/index",
-      "schedule": "0 18 * * *"
-    }
-  ]
+  "framework": "nextjs"
 }
