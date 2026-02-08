@@ -7,11 +7,12 @@ const DATABASE_URL =
 
 console.log("[DB] Initializing PostgreSQL connection to:", DATABASE_URL.replace(/:[^:@]+@/, ":***@"));
 
-// Vercel Postgres (Neon) requires SSL
+// Remote databases (Vercel/Neon, Railway) need SSL
 const needsSsl =
   DATABASE_URL.includes(".neon.tech") ||
   DATABASE_URL.includes("sslmode=require") ||
-  DATABASE_URL.includes(".vercel-storage.com");
+  DATABASE_URL.includes(".vercel-storage.com") ||
+  DATABASE_URL.includes(".rlwy.net");
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
