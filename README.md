@@ -115,7 +115,7 @@ Visit **https://flare-aid.vercel.app/** — connect MetaMask (Coston2 network) a
 - **Email:** admin@flareaid.org
 - **Password:** admin123
 
-### Donations are sent to test accounts
+### Donations are sent to test accounts!!!
 ---
 
 ## 📁 Project Structure
