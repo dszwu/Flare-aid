@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+*.md
+.env
+.env.*
+packages/contracts/artifacts
+packages/contracts/cache
+packages/contracts/typechain-types
+packages/web/flareaid.db

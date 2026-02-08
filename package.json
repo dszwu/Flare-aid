@@ -1,0 +1,19 @@
+{
+  "name": "flare-aid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Disaster-relief platform on Flare Network with transparent donations and FTSO price feeds",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/web",
+    "build": "npm run build --workspace=packages/contracts && npm run build --workspace=packages/web",
+    "test": "npm run test --workspace=packages/contracts",
+    "compile": "npm run compile --workspace=packages/contracts",
+    "deploy": "npm run deploy:coston2 --workspace=packages/contracts",
+    "deploy:coston2": "npm run deploy:coston2 --workspace=packages/contracts",
+    "seed": "npm run seed --workspace=packages/web",
+    "ingest": "npm run ingest --workspace=packages/web"
+  }
+}

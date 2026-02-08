@@ -1,0 +1,12 @@
+{
+  "contracts": {
+    "DonationVault": "0x0000000000000000000000000000000000000000",
+    "AllocationRegistry": "0x0000000000000000000000000000000000000000",
+    "PayoutReceipt": "0x0000000000000000000000000000000000000000",
+    "FTSOPriceFeed": "0x0000000000000000000000000000000000000000"
+  },
+  "network": "114",
+  "deployer": "",
+  "timestamp": "",
+  "_note": "These are placeholder addresses. Run `npm run deploy:coston2` to deploy and update."
+}
