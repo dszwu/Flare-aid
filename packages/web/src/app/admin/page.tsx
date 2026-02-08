@@ -32,8 +32,14 @@ export default function AdminDashboard() {
           <div className="text-3xl font-bold text-gray-900">{stats?.activeEvents || 0}</div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="text-sm text-gray-500">Total Donations</div>
-          <div className="text-3xl font-bold text-flare-600">{stats?.donationCount || 0}</div>
+          <div className="text-sm text-gray-500">Total Donated</div>
+          <div className="text-3xl font-bold text-flare-600">
+            {stats?.totalDonatedWei
+              ? (Number(stats.totalDonatedWei) / 1e18).toFixed(2)
+              : "0"}{" "}
+            <span className="text-base font-medium text-gray-400">C2FLR</span>
+          </div>
+          <div className="text-xs text-gray-400 mt-1">{stats?.donationCount || 0} donations</div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="text-sm text-gray-500">Payouts Completed</div>

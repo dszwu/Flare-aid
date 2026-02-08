@@ -63,7 +63,41 @@ export async function executePayout(eventId: number): Promise<PayoutExecResult> 
   }[];
 
   if (allocations.length === 0) {
-    throw new Error("No allocations set for this event");
+    // No manual allocations — compute from actual donation distribution
+    const donationSplits = await db.query(
+      `SELECT d.org_id, o.name as org_name, o.country,
+              SUM(CAST(d.amount_wei AS NUMERIC)) as org_total
+       FROM donations d
+       JOIN organizations o ON o.id = d.org_id
+       WHERE d.event_id = $1
+       GROUP BY d.org_id, o.name, o.country`,
+      [eventId]
+    );
+
+    if (donationSplits.rows.length === 0) {
+      throw new Error("No allocations or donations found for this event");
+    }
+
+    const donationGrandTotal = donationSplits.rows.reduce(
+      (s: number, r: any) => s + Number(r.org_total), 0
+    );
+
+    let usedBps = 0;
+    for (let i = 0; i < donationSplits.rows.length; i++) {
+      const row = donationSplits.rows[i];
+      const isLast = i === donationSplits.rows.length - 1;
+      const bps = isLast
+        ? 10000 - usedBps
+        : Math.round((Number(row.org_total) / donationGrandTotal) * 10000);
+      usedBps += bps;
+
+      allocations.push({
+        org_id: row.org_id,
+        split_bps: bps,
+        org_name: row.org_name,
+        country: row.country,
+      });
+    }
   }
 
   // 4. Execute payouts per org
