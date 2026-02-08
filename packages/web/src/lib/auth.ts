@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || "flare-aid-dev-secret-change-me"
@@ -51,9 +51,12 @@ export async function authenticateAdmin(
   password: string
 ): Promise<AdminSession | null> {
   console.log("[AUTH] authenticateAdmin called for:", email);
-  const admin = db
-    .prepare("SELECT id, email, password_hash, role FROM admins WHERE email = ?")
-    .get(email) as { id: number; email: string; password_hash: string; role: string } | undefined;
+  await ensureDb();
+  const result = await db.query(
+    "SELECT id, email, password_hash, role FROM admins WHERE email = $1",
+    [email]
+  );
+  const admin = result.rows[0] as { id: number; email: string; password_hash: string; role: string } | undefined;
 
   if (!admin) {
     console.warn("[AUTH] No admin found with email:", email);

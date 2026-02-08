@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { toCamelCase, rowsToCamelCase } from "@/lib/utils";
 
 // GET /api/events/[id] — event detail with allocations and donation total
@@ -15,38 +15,41 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
     }
 
-    const event = db.prepare("SELECT * FROM disaster_events WHERE id = ?").get(id) as any;
+    await ensureDb();
+
+    const eventResult = await db.query("SELECT * FROM disaster_events WHERE id = $1", [id]);
+    const event = eventResult.rows[0];
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404 });
     }
 
-    const allocs = db
-      .prepare(
-        `SELECT a.*, o.name as org_name FROM allocations a
-         LEFT JOIN organizations o ON o.id = a.org_id
-         WHERE a.event_id = ?`
-      )
-      .all(id);
+    const allocsResult = await db.query(
+      `SELECT a.*, o.name as org_name FROM allocations a
+       LEFT JOIN organizations o ON o.id = a.org_id
+       WHERE a.event_id = $1`,
+      [id]
+    );
 
-    const donationTotal = db
-      .prepare(
-        "SELECT COALESCE(SUM(CAST(amount_wei AS REAL)), 0) as total, COUNT(*) as count FROM donations WHERE event_id = ?"
-      )
-      .get(id) as any;
+    const donationTotal = await db.query(
+      "SELECT COALESCE(SUM(CAST(amount_wei AS NUMERIC)), 0) as total, COUNT(*) as count FROM donations WHERE event_id = $1",
+      [id]
+    );
 
-    const recentDonations = db
-      .prepare("SELECT * FROM donations WHERE event_id = ? ORDER BY block_number DESC LIMIT 20")
-      .all(id);
+    const recentDonations = await db.query(
+      "SELECT * FROM donations WHERE event_id = $1 ORDER BY block_number DESC LIMIT 20",
+      [id]
+    );
 
-    console.log(`[API] GET /api/events/${id} => found, ${allocs.length} allocations, ${donationTotal?.count || 0} donations`);
+    const dt = donationTotal.rows[0];
+    console.log(`[API] GET /api/events/${id} => found, ${allocsResult.rows.length} allocations, ${dt?.count || 0} donations`);
     return NextResponse.json({
       success: true,
       data: {
         ...toCamelCase(event),
-        allocations: rowsToCamelCase(allocs),
-        totalDonatedWei: donationTotal?.total?.toString() || "0",
-        donationCount: donationTotal?.count || 0,
-        recentDonations: rowsToCamelCase(recentDonations),
+        allocations: rowsToCamelCase(allocsResult.rows),
+        totalDonatedWei: dt?.total?.toString() || "0",
+        donationCount: parseInt(dt?.count) || 0,
+        recentDonations: rowsToCamelCase(recentDonations.rows),
       },
     });
   } catch (error: any) {

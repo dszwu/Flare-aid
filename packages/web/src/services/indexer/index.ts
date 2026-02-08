@@ -2,10 +2,10 @@
  * On-chain Indexer Service
  *
  * Polls DonationVault, AllocationRegistry, and PayoutReceipt contracts
- * for new events and indexes them into SQLite for the API/frontend.
+ * for new events and indexes them into PostgreSQL for the API/frontend.
  */
 import { createPublicClient, http, parseAbiItem, type Log } from "viem";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 
 // Coston2 config
 const COSTON2_RPC = process.env.COSTON2_RPC_URL || "https://coston2-api.flare.network/ext/C/rpc";
@@ -35,65 +35,71 @@ const client = createPublicClient({
 });
 
 // ─── State ──────────────────────────────────────────────────────────
-function getLastBlock(): number {
-  const row = db
-    .prepare("SELECT last_block_number FROM indexer_state WHERE id = 1")
-    .get() as { last_block_number: number } | undefined;
-  return row?.last_block_number || 0;
+async function getLastBlock(): Promise<number> {
+  const result = await db.query(
+    "SELECT last_block_number FROM indexer_state WHERE id = 1"
+  );
+  return result.rows[0]?.last_block_number || 0;
 }
 
-function setLastBlock(block: number) {
-  db.prepare(
-    "INSERT OR REPLACE INTO indexer_state (id, last_block_number, updated_at) VALUES (1, ?, datetime('now'))"
-  ).run(block);
-}
-
-// ─── Event handlers ─────────────────────────────────────────────────
-function handleDonationReceived(log: Log & { args: Record<string, any> }) {
-  const { donor, eventId, orgId, amount } = log.args;
-  db.prepare(
-    `INSERT OR IGNORE INTO donations (event_id, org_id, donor_address, amount_wei, tx_hash, block_number, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
-  ).run(
-    Number(eventId),
-    Number(orgId),
-    donor as string,
-    amount.toString(),
-    log.transactionHash,
-    Number(log.blockNumber)
+async function setLastBlock(block: number) {
+  await db.query(
+    `INSERT INTO indexer_state (id, last_block_number, updated_at)
+     VALUES (1, $1, NOW())
+     ON CONFLICT (id) DO UPDATE SET last_block_number = $1, updated_at = NOW()`,
+    [block]
   );
 }
 
-function handleAllocationSet(log: Log & { args: Record<string, any> }) {
+// ─── Event handlers ─────────────────────────────────────────────────
+async function handleDonationReceived(log: Log & { args: Record<string, any> }) {
+  const { donor, eventId, orgId, amount } = log.args;
+  await db.query(
+    `INSERT INTO donations (event_id, org_id, donor_address, amount_wei, tx_hash, block_number, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT DO NOTHING`,
+    [
+      Number(eventId),
+      Number(orgId),
+      donor as string,
+      amount.toString(),
+      log.transactionHash,
+      Number(log.blockNumber),
+    ]
+  );
+}
+
+async function handleAllocationSet(log: Log & { args: Record<string, any> }) {
   const { eventId, orgIds, splitsBps } = log.args;
   const eid = Number(eventId);
 
   // Clear existing allocations for this event
-  db.prepare("DELETE FROM allocations WHERE event_id = ?").run(eid);
-
-  const stmt = db.prepare(
-    `INSERT INTO allocations (event_id, org_id, split_bps, tx_hash, created_at)
-     VALUES (?, ?, ?, ?, datetime('now'))`
-  );
+  await db.query("DELETE FROM allocations WHERE event_id = $1", [eid]);
 
   for (let i = 0; i < (orgIds as bigint[]).length; i++) {
-    stmt.run(eid, Number(orgIds[i]), Number(splitsBps[i]), log.transactionHash);
+    await db.query(
+      `INSERT INTO allocations (event_id, org_id, split_bps, tx_hash, created_at)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [eid, Number(orgIds[i]), Number(splitsBps[i]), log.transactionHash]
+    );
   }
 }
 
-function handlePayoutRecorded(log: Log & { args: Record<string, any> }) {
+async function handlePayoutRecorded(log: Log & { args: Record<string, any> }) {
   const { eventId, orgId, amount, fiatCurrency, fiatAmount, offrampRefHash } = log.args;
-  db.prepare(
-    `INSERT OR IGNORE INTO payouts (event_id, org_id, amount_wei, fiat_currency, fiat_amount, offramp_ref, tx_hash, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now'))`
-  ).run(
-    Number(eventId),
-    Number(orgId),
-    amount.toString(),
-    fiatCurrency,
-    fiatAmount,
-    offrampRefHash,
-    log.transactionHash
+  await db.query(
+    `INSERT INTO payouts (event_id, org_id, amount_wei, fiat_currency, fiat_amount, offramp_ref, tx_hash, status, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', NOW())
+     ON CONFLICT DO NOTHING`,
+    [
+      Number(eventId),
+      Number(orgId),
+      amount.toString(),
+      fiatCurrency,
+      fiatAmount,
+      offrampRefHash,
+      log.transactionHash,
+    ]
   );
 }
 
@@ -110,7 +116,9 @@ const PAYOUT_EVENT = parseAbiItem(
 
 // ─── Main loop ──────────────────────────────────────────────────────
 export async function runIndexer(): Promise<{ indexed: number; toBlock: number }> {
-  const fromBlock = BigInt(getLastBlock() + 1);
+  await ensureDb();
+
+  const fromBlock = BigInt(await getLastBlock() + 1);
   const latestBlock = await client.getBlockNumber();
 
   if (fromBlock > latestBlock) {
@@ -154,12 +162,12 @@ export async function runIndexer(): Promise<{ indexed: number; toBlock: number }
         : Promise.resolve([]),
     ]);
 
-    for (const log of donationLogs) handleDonationReceived(log as any);
-    for (const log of allocationLogs) handleAllocationSet(log as any);
-    for (const log of payoutLogs) handlePayoutRecorded(log as any);
+    for (const log of donationLogs) await handleDonationReceived(log as any);
+    for (const log of allocationLogs) await handleAllocationSet(log as any);
+    for (const log of payoutLogs) await handlePayoutRecorded(log as any);
 
     totalIndexed += donationLogs.length + allocationLogs.length + payoutLogs.length;
-    setLastBlock(Number(currentTo));
+    await setLastBlock(Number(currentTo));
     currentFrom = currentTo + 1n;
   }
 

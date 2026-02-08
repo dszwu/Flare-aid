@@ -1,39 +1,47 @@
 import { NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 
 // GET /api/stats — public aggregate stats for transparency
 export async function GET() {
   console.log("[API] GET /api/stats");
   try {
-    const totalDonated = db
-      .prepare("SELECT COALESCE(SUM(CAST(amount_wei AS REAL)), 0) as total FROM donations")
-      .get() as any;
+    await ensureDb();
 
-    const donationCount = db
-      .prepare("SELECT COUNT(*) as count FROM donations")
-      .get() as any;
+    const totalDonated = await db.query(
+      "SELECT COALESCE(SUM(CAST(amount_wei AS NUMERIC)), 0) as total FROM donations"
+    );
 
-    const activeEvents = db
-      .prepare("SELECT COUNT(*) as count FROM disaster_events WHERE status = 'approved'")
-      .get() as any;
+    const donationCount = await db.query(
+      "SELECT COUNT(*) as count FROM donations"
+    );
 
-    const completedPayouts = db
-      .prepare("SELECT COUNT(*) as count FROM payouts WHERE status = 'completed'")
-      .get() as any;
+    const activeEvents = await db.query(
+      "SELECT COUNT(*) as count FROM disaster_events WHERE status = 'approved'"
+    );
 
-    const uniqueDonors = db
-      .prepare("SELECT COUNT(DISTINCT donor_address) as count FROM donations")
-      .get() as any;
+    const completedPayouts = await db.query(
+      "SELECT COUNT(*) as count FROM payouts WHERE status = 'completed'"
+    );
 
-    console.log("[API] GET /api/stats =>", { totalDonated: totalDonated?.total, donationCount: donationCount?.count, activeEvents: activeEvents?.count, completedPayouts: completedPayouts?.count, uniqueDonors: uniqueDonors?.count });
+    const uniqueDonors = await db.query(
+      "SELECT COUNT(DISTINCT donor_address) as count FROM donations"
+    );
+
+    const td = totalDonated.rows[0];
+    const dc = donationCount.rows[0];
+    const ae = activeEvents.rows[0];
+    const cp = completedPayouts.rows[0];
+    const ud = uniqueDonors.rows[0];
+
+    console.log("[API] GET /api/stats =>", { totalDonated: td?.total, donationCount: dc?.count, activeEvents: ae?.count, completedPayouts: cp?.count, uniqueDonors: ud?.count });
     return NextResponse.json({
       success: true,
       data: {
-        totalDonatedWei: totalDonated?.total?.toString() || "0",
-        donationCount: donationCount?.count || 0,
-        activeEvents: activeEvents?.count || 0,
-        completedPayouts: completedPayouts?.count || 0,
-        uniqueDonors: uniqueDonors?.count || 0,
+        totalDonatedWei: td?.total?.toString() || "0",
+        donationCount: parseInt(dc?.count) || 0,
+        activeEvents: parseInt(ae?.count) || 0,
+        completedPayouts: parseInt(cp?.count) || 0,
+        uniqueDonors: parseInt(ud?.count) || 0,
       },
     });
   } catch (error: any) {

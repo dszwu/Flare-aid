@@ -17,7 +17,7 @@ Flare-Aid is a decentralized disaster-relief platform that monitors global disas
 | **DonationVault** | Solidity smart contract accepting C2FLR with per-event, per-org accounting |
 | **Allocation Registry** | Admin-controlled fund splits with on-chain 10,000 bps (basis points) invariant |
 | **Payout Receipts** | Immutable on-chain record of every off-ramp distribution |
-| **On-chain Indexer** | Lightweight block poller syncing contract events to SQLite for fast API queries |
+| **On-chain Indexer** | Lightweight block poller syncing contract events to PostgreSQL for fast API queries |
 | **Donor Dashboard** | Wallet-connected donation history and impact tracking |
 | **Transparency Page** | Public ledger view with FTSO integration showcase |
 | **Admin Panel** | Event review/approval, org management, allocation setting, payout execution |
@@ -42,7 +42,7 @@ Flare-Aid is a decentralized disaster-relief platform that monitors global disas
 │          On-chain Indexer (Block Poller)             │
 │          Payout Service (Mock Off-ramp Adapter)      │
 ├─────────────────────────────────────────────────────┤
-│              SQLite + Drizzle ORM (WAL mode)         │
+│              PostgreSQL (pg driver)                   │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -138,7 +138,7 @@ flare-aid/
 │       └── src/
 │           ├── app/        # App Router pages & API routes
 │           ├── components/ # React components
-│           ├── db/         # SQLite schema & seed
+│           ├── db/         # PostgreSQL schema & seed
 │           ├── lib/        # Utils, auth, wagmi config, ABIs
 │           └── services/   # Ingestion, indexer, payout
 ├── .env.example

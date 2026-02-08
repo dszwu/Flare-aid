@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { rowsToCamelCase } from "@/lib/utils";
 
 // GET /api/events — list approved events with donation totals
@@ -13,35 +13,34 @@ export async function GET(req: NextRequest) {
   console.log("[API] GET /api/events params:", { type, page, pageSize, offset });
 
   try {
-    let events: any[];
+    await ensureDb();
+    let result;
     if (type) {
-      events = db
-        .prepare(
-          `SELECT e.*, COALESCE(SUM(CAST(d.amount_wei AS REAL)), 0) as totalDonatedWei
-           FROM disaster_events e
-           LEFT JOIN donations d ON d.event_id = e.id
-           WHERE e.status = 'approved' AND e.type = ?
-           GROUP BY e.id
-           ORDER BY e.created_at DESC
-           LIMIT ? OFFSET ?`
-        )
-        .all(type, pageSize, offset);
+      result = await db.query(
+        `SELECT e.*, COALESCE(SUM(CAST(d.amount_wei AS NUMERIC)), 0) as "totalDonatedWei"
+         FROM disaster_events e
+         LEFT JOIN donations d ON d.event_id = e.id
+         WHERE e.status = 'approved' AND e.type = $1
+         GROUP BY e.id
+         ORDER BY e.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [type, pageSize, offset]
+      );
     } else {
-      events = db
-        .prepare(
-          `SELECT e.*, COALESCE(SUM(CAST(d.amount_wei AS REAL)), 0) as totalDonatedWei
-           FROM disaster_events e
-           LEFT JOIN donations d ON d.event_id = e.id
-           WHERE e.status = 'approved'
-           GROUP BY e.id
-           ORDER BY e.created_at DESC
-           LIMIT ? OFFSET ?`
-        )
-        .all(pageSize, offset);
+      result = await db.query(
+        `SELECT e.*, COALESCE(SUM(CAST(d.amount_wei AS NUMERIC)), 0) as "totalDonatedWei"
+         FROM disaster_events e
+         LEFT JOIN donations d ON d.event_id = e.id
+         WHERE e.status = 'approved'
+         GROUP BY e.id
+         ORDER BY e.created_at DESC
+         LIMIT $1 OFFSET $2`,
+        [pageSize, offset]
+      );
     }
 
-    console.log(`[API] GET /api/events => ${events.length} events`);
-    return NextResponse.json({ success: true, data: rowsToCamelCase(events) });
+    console.log(`[API] GET /api/events => ${result.rows.length} events`);
+    return NextResponse.json({ success: true, data: rowsToCamelCase(result.rows) });
   } catch (error: any) {
     console.error("[API] GET /api/events ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

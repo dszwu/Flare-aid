@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { getSessionFromRequest } from "@/lib/auth";
 
 // POST /api/allocations — set allocation splits for an event (admin only)
@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await ensureDb();
     const body = await req.json();
     console.log("[API] POST /api/allocations body:", { eventId: body.eventId, splitsCount: body.splits?.length });
     const { eventId, splits } = body;
@@ -32,15 +33,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Remove existing allocations for this event
-    db.prepare("DELETE FROM allocations WHERE event_id = ?").run(eventId);
+    await db.query("DELETE FROM allocations WHERE event_id = $1", [eventId]);
 
     // Insert new allocations
     const now = new Date().toISOString();
-    const stmt = db.prepare(
-      "INSERT INTO allocations (event_id, org_id, split_bps, approved_by, approved_at) VALUES (?, ?, ?, ?, ?)"
-    );
     for (const split of splits) {
-      stmt.run(eventId, split.orgId, split.splitBps, session.email, now);
+      await db.query(
+        "INSERT INTO allocations (event_id, org_id, split_bps, approved_by, approved_at) VALUES ($1, $2, $3, $4, $5)",
+        [eventId, split.orgId, split.splitBps, session.email, now]
+      );
     }
 
     console.log(`[API] POST /api/allocations => saved ${splits.length} splits for event ${eventId}`);

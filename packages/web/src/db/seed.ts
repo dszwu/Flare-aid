@@ -1,29 +1,34 @@
-import { db } from "./index";
+import { db, ensureDb } from "./index";
 import bcrypt from "bcryptjs";
 
 /**
  * Seeds the database with initial admin user and sample organizations.
  * Safe to run multiple times — skips if data already exists.
  */
-export function seed() {
-  // Seed default admin
-  const existingAdmin = db
-    .prepare("SELECT id FROM admins WHERE email = ?")
-    .get("admin@flareaid.org") as any;
+export async function seed() {
+  await ensureDb();
 
-  if (!existingAdmin) {
+  // Seed default admin
+  const existingAdmin = await db.query(
+    "SELECT id FROM admins WHERE email = $1",
+    ["admin@flareaid.org"]
+  );
+
+  if (existingAdmin.rows.length === 0) {
     const hash = bcrypt.hashSync("admin123", 10);
-    db.prepare(
-      "INSERT INTO admins (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)"
-    ).run("admin@flareaid.org", hash, "admin", new Date().toISOString());
+    await db.query(
+      "INSERT INTO admins (email, password_hash, role, created_at) VALUES ($1, $2, $3, $4)",
+      ["admin@flareaid.org", hash, "admin", new Date().toISOString()]
+    );
     console.log("Seeded admin: admin@flareaid.org / admin123");
   } else {
     console.log("Admin already exists, skipping.");
   }
 
   // Seed sample organizations
-  const orgCount = db.prepare("SELECT COUNT(*) as cnt FROM organizations").get() as any;
-  if (!orgCount || orgCount.cnt === 0) {
+  const orgCount = await db.query("SELECT COUNT(*) as cnt FROM organizations");
+  const cnt = parseInt(orgCount.rows[0]?.cnt || "0");
+  if (cnt === 0) {
     const sampleOrgs = [
       { name: "Red Cross International", country: "Switzerland", wallet: "0x742d35Cc6634C0532925a3b844Bc9e7595f5bA16" },
       { name: "Médecins Sans Frontières", country: "France", wallet: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199" },
@@ -32,19 +37,18 @@ export function seed() {
       { name: "Kenya Red Cross", country: "Kenya", wallet: "0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec" },
     ];
 
-    const stmt = db.prepare(
-      `INSERT INTO organizations (name, country, wallet_address, payout_method, payout_details, allowlisted, created_at)
-       VALUES (?, ?, ?, 'bank', '{}', 1, ?)`
-    );
-
     for (const org of sampleOrgs) {
-      stmt.run(org.name, org.country, org.wallet, new Date().toISOString());
+      await db.query(
+        `INSERT INTO organizations (name, country, wallet_address, payout_method, payout_details, allowlisted, created_at)
+         VALUES ($1, $2, $3, 'bank', '{}', 1, $4)`,
+        [org.name, org.country, org.wallet, new Date().toISOString()]
+      );
     }
     console.log(`Seeded ${sampleOrgs.length} organizations`);
   } else {
-    console.log(`Organizations already seeded (${orgCount.cnt} found), skipping.`);
+    console.log(`Organizations already seeded (${cnt} found), skipping.`);
   }
 }
 
 // Run if called directly
-seed();
+seed().catch(console.error);

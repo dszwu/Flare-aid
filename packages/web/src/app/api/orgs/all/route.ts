@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { rowsToCamelCase } from "@/lib/utils";
 
@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const orgs = db.prepare("SELECT * FROM organizations").all();
-    console.log(`[API] GET /api/orgs/all => ${orgs.length} orgs`);
-    return NextResponse.json({ success: true, data: rowsToCamelCase(orgs) });
+    await ensureDb();
+    const result = await db.query("SELECT * FROM organizations");
+    console.log(`[API] GET /api/orgs/all => ${result.rows.length} orgs`);
+    return NextResponse.json({ success: true, data: rowsToCamelCase(result.rows) });
   } catch (error: any) {
     console.error("[API] GET /api/orgs/all ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

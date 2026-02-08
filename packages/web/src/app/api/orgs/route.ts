@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { rowsToCamelCase } from "@/lib/utils";
 
@@ -7,11 +7,12 @@ import { rowsToCamelCase } from "@/lib/utils";
 export async function GET() {
   console.log("[API] GET /api/orgs");
   try {
-    const orgs = db
-      .prepare("SELECT * FROM organizations WHERE allowlisted = 1")
-      .all();
-    console.log(`[API] GET /api/orgs => ${orgs.length} orgs`);
-    return NextResponse.json({ success: true, data: rowsToCamelCase(orgs) });
+    await ensureDb();
+    const result = await db.query(
+      "SELECT * FROM organizations WHERE allowlisted = 1"
+    );
+    console.log(`[API] GET /api/orgs => ${result.rows.length} orgs`);
+    return NextResponse.json({ success: true, data: rowsToCamelCase(result.rows) });
   } catch (error: any) {
     console.error("[API] GET /api/orgs ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await ensureDb();
     const body = await req.json();
     const { name, country, walletAddress, contactInfo, allowlisted } = body;
 
@@ -35,16 +37,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Name and country required" }, { status: 400 });
     }
 
-    db.prepare(
+    await db.query(
       `INSERT INTO organizations (name, country, wallet_address, contact_info, payout_method, payout_details, allowlisted, created_at)
-       VALUES (?, ?, ?, ?, 'bank', '{}', ?, ?)`
-    ).run(
-      name,
-      country,
-      walletAddress || "",
-      contactInfo || "",
-      allowlisted ? 1 : 0,
-      new Date().toISOString()
+       VALUES ($1, $2, $3, $4, 'bank', '{}', $5, $6)`,
+      [
+        name,
+        country,
+        walletAddress || "",
+        contactInfo || "",
+        allowlisted ? 1 : 0,
+        new Date().toISOString(),
+      ]
     );
 
     return NextResponse.json({ success: true });

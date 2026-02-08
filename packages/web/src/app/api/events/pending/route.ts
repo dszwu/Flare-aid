@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { getSessionFromRequest } from "@/lib/auth";
 import { rowsToCamelCase } from "@/lib/utils";
 
@@ -13,12 +13,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const events = db
-      .prepare("SELECT * FROM disaster_events WHERE status = 'pending' ORDER BY severity_score DESC")
-      .all();
+    await ensureDb();
+    const result = await db.query(
+      "SELECT * FROM disaster_events WHERE status = 'pending' ORDER BY severity_score DESC"
+    );
 
-    console.log(`[API] GET /api/events/pending => ${events.length} events`);
-    return NextResponse.json({ success: true, data: rowsToCamelCase(events) });
+    console.log(`[API] GET /api/events/pending => ${result.rows.length} events`);
+    return NextResponse.json({ success: true, data: rowsToCamelCase(result.rows) });
   } catch (error: any) {
     console.error("[API] GET /api/events/pending ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

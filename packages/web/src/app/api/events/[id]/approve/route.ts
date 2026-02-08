@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 import { getSessionFromRequest } from "@/lib/auth";
 
 // POST /api/events/[id]/approve — approve a pending event (admin only)
@@ -18,7 +18,10 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
     }
 
-    const event = db.prepare("SELECT * FROM disaster_events WHERE id = ?").get(id) as any;
+    await ensureDb();
+
+    const eventResult = await db.query("SELECT * FROM disaster_events WHERE id = $1", [id]);
+    const event = eventResult.rows[0];
     if (!event) {
       return NextResponse.json({ success: false, error: "Event not found" }, { status: 404 });
     }
@@ -26,9 +29,10 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Event is not pending" }, { status: 400 });
     }
 
-    db.prepare(
-      "UPDATE disaster_events SET status = 'approved', approved_by = ?, approved_at = ? WHERE id = ?"
-    ).run(session.email, new Date().toISOString(), id);
+    await db.query(
+      "UPDATE disaster_events SET status = 'approved', approved_by = $1, approved_at = $2 WHERE id = $3",
+      [session.email, new Date().toISOString(), id]
+    );
 
     return NextResponse.json({ success: true, data: { id, status: "approved" } });
   } catch (error: any) {

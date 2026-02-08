@@ -4,7 +4,7 @@ import { GDACSAdapter } from "./gdacs";
 import { ReliefWebAdapter } from "./reliefweb";
 import { EONETAdapter } from "./eonet";
 import { DisasterFeedAdapter } from "./adapter";
-import { db } from "@/db";
+import { db, ensureDb } from "@/db";
 
 const adapters: DisasterFeedAdapter[] = [
   new USGSAdapter(),
@@ -16,11 +16,12 @@ const adapters: DisasterFeedAdapter[] = [
 /**
  * Deduplicates events by checking externalId + source in the database.
  */
-function isDuplicate(event: NormalizedEvent): boolean {
-  const existing = db
-    .prepare("SELECT id FROM disaster_events WHERE external_id = ? AND source = ?")
-    .get(event.externalId, event.source);
-  return !!existing;
+async function isDuplicate(event: NormalizedEvent): Promise<boolean> {
+  const result = await db.query(
+    "SELECT id FROM disaster_events WHERE external_id = $1 AND source = $2",
+    [event.externalId, event.source]
+  );
+  return result.rows.length > 0;
 }
 
 /**
@@ -29,6 +30,8 @@ function isDuplicate(event: NormalizedEvent): boolean {
  * Returns count of new events added.
  */
 export async function runIngestion(): Promise<{ total: number; new: number; sources: Record<string, number> }> {
+  await ensureDb();
+
   const results: NormalizedEvent[] = [];
   const sourceCounts: Record<string, number> = {};
 
@@ -52,36 +55,38 @@ export async function runIngestion(): Promise<{ total: number; new: number; sour
   let newCount = 0;
 
   for (const event of results) {
-    if (isDuplicate(event)) continue;
+    if (await isDuplicate(event)) continue;
 
-    db.prepare(
+    await db.query(
       `INSERT INTO disaster_events (external_id, source, type, title, description, latitude, longitude, severity_score, raw_payload, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-    ).run(
-      event.externalId,
-      event.source,
-      event.type,
-      event.title,
-      event.description,
-      event.latitude,
-      event.longitude,
-      event.severityScore,
-      JSON.stringify(event.rawPayload),
-      event.occurredAt || new Date().toISOString()
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)`,
+      [
+        event.externalId,
+        event.source,
+        event.type,
+        event.title,
+        event.description,
+        event.latitude,
+        event.longitude,
+        event.severityScore,
+        JSON.stringify(event.rawPayload),
+        event.occurredAt || new Date().toISOString(),
+      ]
     );
 
     newCount++;
 
     // Create notification for high-severity events
     if (event.severityScore >= 50) {
-      db.prepare(
+      await db.query(
         `INSERT INTO notifications (type, title, message, created_at)
-         VALUES (?, ?, ?, ?)`
-      ).run(
-        event.severityScore >= 75 ? "high_severity" : "new_event",
-        `New ${event.type}: ${event.title}`,
-        `Severity: ${event.severityScore}/100. Source: ${event.source}`,
-        new Date().toISOString()
+         VALUES ($1, $2, $3, $4)`,
+        [
+          event.severityScore >= 75 ? "high_severity" : "new_event",
+          `New ${event.type}: ${event.title}`,
+          `Severity: ${event.severityScore}/100. Source: ${event.source}`,
+          new Date().toISOString(),
+        ]
       );
     }
   }
